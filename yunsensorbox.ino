@@ -2,18 +2,16 @@
 // us communicate with the shell
 #include <Bridge.h>
 #include <Process.h>
-#include "DHT.h"
+#include <TinkerKit.h>
 
-// Temperature/Humidity Sensor
-#define DHTPIN 2
-#define DHTTYPE DHT22
-DHT dht(DHTPIN, DHTTYPE);
+
+// Temperature Sensor
+TKThermistor therm(I1);
 
 // Light Sensor
-int lightPin = 0;
+TKLightSensor ldr(I0);
 
-// Motion Sensor
-int motionPin = 3;
+
 
 ////////////////////////////
 // Initial State Streamer //
@@ -23,15 +21,15 @@ String ISBucketURL = "https://groker.initialstate.com/api/buckets";
 // URL to IS Event API
 String ISEventURL = "https://groker.initialstate.com/api/events";
 // Access key (the one you find in your account settings):
-String accessKey = "Your_Access_Key";
+String accessKey = "Access_Key";
 // Bucket key (hidden reference to your bucket that allows appending):
-String bucketKey = "yun_sensor_box";
+String bucketKey = "yun_sensors";
 // Bucket name (name your data will be associated with in Initial State):
-String bucketName = ":house_with_garden: Yun Sensor Box";
+String bucketName = ":house_with_garden: Yun Sensors";
 // How many signals are in your stream? You can have as few or as many as you want
-const int NUM_SIGNALS = 6;
+const int NUM_SIGNALS = 2;
 // What are the names of your signals (i.e. "Temperature", "Humidity", etc.)
-String signalName[NUM_SIGNALS] = {":sweat_drops: Humidity", ":sunny: Temperature", ":fire: Heat Index", ":bulb: Light", ":wave: Motion", ":bangbang: How Am I Feeling?"};
+String signalName[NUM_SIGNALS] = {":sunny: Temperature", ":bulb: Light"};
 // This array is to store our signal data later
 String signalData[NUM_SIGNALS];
 
@@ -41,8 +39,6 @@ void setup()
 {
   Bridge.begin();
   Serial.begin(9600);
-
-  dht.begin();
 
   while (!Serial);
     // Post Bucket
@@ -59,9 +55,9 @@ void loop()
   delay(2000);
 
   // Gather Data
-  takeTempHum();
+  takeTemp();
   takeLight();
-  takeMotion();
+
 
   // Post Data
   Serial.println("Posting Data!");
@@ -78,77 +74,27 @@ void loop()
 // They do not need to be edited - everything you would need to change for 
 // your situation can be found above
 
-void takeTempHum()
+void takeTemp()
 {
   // Reading temperature or humidity takes about 250 milliseconds!
   // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
-  float h = dht.readHumidity();
   // Read temperature as Celsius (the default)
-  float t = dht.readTemperature();
+  float t = therm.readCelsius();
   // Read temperature as Fahrenheit (isFahrenheit = true)
-  float f = dht.readTemperature(true);
 
   // Check if any reads failed and exit early (to try again).
-  if (isnan(h) || isnan(t) || isnan(f)) {
-    h = 0;
+  if (isnan(t)) {
     t = 0;
-    f = 0;
     return;
   }
-
-  // Compute heat index in Fahrenheit
-  float hif = dht.computeHeatIndex(f, h);
-
-  // Change the emoji displayed based on heat index ranges
-  String warning;
-  
-  if (hif<94 && hif>80)
-  {
-    warning = ":sweat: :sweat_drops:";
-  }
-  else if (hif<105 && hif>93)
-  {
-    warning = ":cold_sweat: :sweat_drops:";
-  }
-  else if (hif<132 && hif>104)
-  {
-    warning = ":dizzy_face: :sweat_drops:";
-  }
-  else if (hif>131)
-  {
-    warning = ":dizzy_face: :warning:";
-  }
-  else
-  {
-    warning = ":grinning:";
-  }
-
-  signalData[0] = String(h);
-  signalData[1] = String(f);
-  signalData[2] = String(hif);
-  signalData[5] = String(warning);
+  signalData[0] = String(t);
 }
 
 void takeLight()
 {
-  int light = analogRead(lightPin);
+  int light = ldr.read();
 
-  signalData[3] = String(light);
-}
-
-void takeMotion()
-{
-  pinMode(motionPin, INPUT);
-  int motion = digitalRead(motionPin);
-  
-  if (motion == HIGH)
-  {
-    signalData[4] = String(":runner:");
-  }
-  else
-  {
-    signalData[4] = String(":no_pedestrians:");
-  }  
+  signalData[1] = String(light);
 }
 
 void postBucket()
